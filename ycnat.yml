@@ -1,0 +1,79 @@
+kernel:
+  image: linuxkit/kernel:5.4.39
+  cmdline: "console=ttyS0"
+init:
+- linuxkit/init:a68f9fa0c1d9dbfc9c23663749a0b7ac510cbe1c
+- linuxkit/runc:v0.8
+- linuxkit/containerd:a4aa19c608556f7d786852557c36136255220c1f
+- linuxkit/ca-certificates:v0.8
+onboot:
+- name: sysctl
+  image: linuxkit/sysctl:v0.8
+  readonly: false
+  binds:
+  - /etc/sysctl.d/01-nat.conf:/etc/sysctl.d/01-nat.conf
+- name: sysfs
+  image: linuxkit/sysfs:v0.8
+- name: iptables
+  image: containerskit/iptables:1.0.0
+  pid: host
+  net: host
+  binds:
+  - /etc/sysconfig/iptables:/etc/sysconfig/iptables
+  command:
+  - '/bin/sh'
+  - '-c'
+  - 'iptables-restore -v < /etc/sysconfig/iptables'
+  capabilities:
+  - CAP_NET_ADMIN
+  - CAP_NET_RAW
+- name: dhcpcd
+  image: linuxkit/dhcpcd:v0.8
+  command:
+  - '/sbin/dhcpcd'
+  - '--nobackground'
+  - '-f'
+  - '/dhcpcd.conf'
+  - '-1'
+- name: metadata
+  image: linuxkit/metadata:v0.8
+- name: ycnat
+  image: containerskit/ycnat:1.0.0
+  binds:
+  - /run/config/userdata:/run/config/rtid
+services:
+- name: rngd
+  image: linuxkit/rngd:v0.8
+- name: ntpd
+  image: linuxkit/openntpd:v0.8
+- name: sshd
+  image: linuxkit/sshd:666b4a1a323140aa1f332826164afba506abf597
+  binds:
+  - /run/config/ssh/authorized_keys:/root/.ssh/authorized_keys
+  - /etc/resolv.conf:/etc/resolv.conf
+  - /run:/run
+  - /tmp:/tmp
+  - /etc:/hostroot/etc
+  - /usr/bin/ctr:/usr/bin/ctr
+  - /usr/bin/runc:/usr/bin/runc
+  - /containers:/containers
+  - /var/log:/var/log
+  - /var/lib/containerd:/var/lib/containerd
+  - /dev:/dev
+  - /sys:/sys
+  capabilities:
+  - all
+files:
+- path: /etc/sysconfig/iptables
+  contents: |
+    *nat
+    -A POSTROUTING -o eth0 -j MASQUERADE
+    COMMIT
+- path: /etc/sysctl.d/01-nat.conf
+  contents: |
+    net.ipv4.ip_forward=1
+    net.ipv4.conf.eth0.send_redirects=0
+trust:
+  org:
+    - linuxkit
+    - library
