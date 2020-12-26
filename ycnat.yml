@@ -41,6 +41,7 @@ onboot:
   image: containerskit/ycnat:1.0.0
   binds:
   - /run/config/userdata:/run/config/rtid
+  - /etc/resolv.conf:/etc/resolv.conf
 services:
 - name: rngd
   image: linuxkit/rngd:v0.8

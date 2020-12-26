@@ -23,6 +23,8 @@ Arguments:
   -help print this message and exist
 `
 
+const retry = 60
+
 type args struct {
 	rtid *string
 }
@@ -82,7 +84,11 @@ func run() error {
 		},
 	})
 
-	for !op.Done {
+	if err != nil {
+		return err
+	}
+
+	for i := 0; i < retry && !op.Done; i++ {
 		fmt.Println("waiting for update operation to be completed...")
 		time.Sleep(1 * time.Second)
 	}

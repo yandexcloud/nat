@@ -10,11 +10,12 @@ ADD docker-entrypoint.sh /out/usr/bin/
 
 RUN mkdir -p /out/etc/apk && cp -r /etc/apk/* /out/etc/apk/
 RUN apk add --no-cache --initdb -p /out \
-    alpine-baselayout
+    alpine-baselayout \
+    ca-certificates
 RUN rm -rf /out/etc/apk /out/lib/apk /out/var/cache
 
-RUN go build -ldflags "-s -w" -o /out/usr/bin/усnat
-RUN upx /out/usr/bin/усnat
+RUN go build -ldflags "-s -w" -o /out/usr/bin/ycnat
+RUN upx /out/usr/bin/ycnat
 
 FROM scratch
 COPY --from=build /out /
