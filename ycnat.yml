@@ -20,38 +20,39 @@ onboot:
   net: host
   binds:
   - /etc/sysconfig/iptables:/etc/sysconfig/iptables
-  command:
-  - '/bin/sh'
-  - '-c'
-  - 'iptables-restore -v < /etc/sysconfig/iptables'
+  command: ['/bin/sh', '-c', 'iptables-restore -v < /etc/sysconfig/iptables']
   capabilities:
   - CAP_NET_ADMIN
   - CAP_NET_RAW
 - name: dhcpcd
   image: linuxkit/dhcpcd:v0.8
-  command:
-  - '/sbin/dhcpcd'
-  - '--nobackground'
-  - '-f'
-  - '/dhcpcd.conf'
-  - '-1'
+  command: ['/sbin/dhcpcd', '--nobackground', '-f', '/dhcpcd.conf', '-1']
 - name: metadata
-  image: linuxkit/metadata:v0.8
+  image: containerskit/metadata:1.0.0
+  cwd: /run/config
+  binds:
+  - /run:/run:rw
+  runtime:
+    mkdir:
+    - /run/config
 - name: ycnat
   image: containerskit/ycnat:1.0.0
   binds:
-  - /run/config/userdata:/run/config/rtid
+  - /run/config/userdata:/run/config/rt
+  - /run/config/local_ipv4:/run/config/ip
   - /etc/resolv.conf:/etc/resolv.conf
+  - /etc/ssl/certs:/etc/ssl/certs
 services:
 - name: rngd
   image: linuxkit/rngd:v0.8
 - name: ntpd
   image: linuxkit/openntpd:v0.8
 - name: sshd
-  image: linuxkit/sshd:666b4a1a323140aa1f332826164afba506abf597
+  image: containerskit/sshd:1.0.0
   binds:
   - /run/config/ssh/authorized_keys:/root/.ssh/authorized_keys
   - /etc/resolv.conf:/etc/resolv.conf
+  - /etc/ssl/certs:/etc/ssl/certs
   - /run:/run
   - /tmp:/tmp
   - /etc:/hostroot/etc

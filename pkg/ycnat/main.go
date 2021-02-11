@@ -6,7 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
+	"log"
 	"os"
 	"time"
 
@@ -26,11 +26,13 @@ Arguments:
 const retry = 60
 
 type args struct {
-	rtid *string
+	rt *string
+	ip *string
 }
 
 var argv = args{
-	rtid: flag.String("rtid", "", "required. yandex vpc route table id"),
+	rt: flag.String("rt", "", "required. path to yandex vpc route table id"),
+	ip: flag.String("ip", "", "required. path to local ipv4 address"),
 }
 
 func init() {
@@ -39,29 +41,36 @@ func init() {
 		fmt.Println(usage)
 		flag.PrintDefaults()
 	}
+
+	log.SetOutput(os.Stdout)
+	log.SetPrefix("ycnat [INF] ")
+	log.SetFlags(0)
 }
 
 func run() error {
-	if *argv.rtid == "" {
-		return errors.New("missing required flag -rtid")
+	if *argv.rt == "" {
+		return errors.New("missing required flag -rt")
+	}
+	if *argv.ip == "" {
+		return errors.New("missing required flag -ip")
 	}
 
-	fmt.Println("getting local IP address from the instance metadata...")
-	ipreq, err := http.Get("http://169.254.169.254/latest/meta-data/local-ipv4")
+	rt, err := ioutil.ReadFile(*argv.rt)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read route table id: %w", err)
 	}
-	defer ipreq.Body.Close()
 
-	ip, err := ioutil.ReadAll(ipreq.Body)
+	ip, err := ioutil.ReadFile(*argv.ip)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to read local ipv4: %w", err)
 	}
-	fmt.Printf("IP address is %s\n", string(ip))
+
+	log.Printf("route table id: %s", string(rt))
+	log.Printf("local ipv4: %s", string(ip))
 
 	ctx := context.Background()
 
-	fmt.Println("initializing yandex cloud sdk...")
+	log.Println("initializing yandex cloud sdk")
 	sdk, err := ycsdk.Build(ctx, ycsdk.Config{
 		Credentials: ycsdk.InstanceServiceAccount(),
 	})
@@ -69,9 +78,9 @@ func run() error {
 		return err
 	}
 
-	fmt.Printf("updating route table %s\n", *argv.rtid)
+	log.Println("updating route table")
 	op, err := sdk.VPC().RouteTable().Update(ctx, &vpc.UpdateRouteTableRequest{
-		RouteTableId: *argv.rtid,
+		RouteTableId: string(rt),
 		StaticRoutes: []*vpc.StaticRoute{
 			{
 				Destination: &vpc.StaticRoute_DestinationPrefix{
@@ -85,22 +94,22 @@ func run() error {
 	})
 
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to update route table id: %w", err)
 	}
 
 	for i := 0; i < retry && !op.Done; i++ {
-		fmt.Println("waiting for update operation to be completed...")
+		log.Println("waiting for update operation to be completed")
 		time.Sleep(1 * time.Second)
 	}
 
-	fmt.Println("done")
+	log.Println("done")
 	return nil
 }
 
 func main() {
 	flag.Parse()
 	if err := run(); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		fmt.Fprintf(os.Stdout, "ycnat [ERR]: %v\n", err)
 		os.Exit(1)
 	}
 }
